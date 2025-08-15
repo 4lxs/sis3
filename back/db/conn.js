@@ -1,0 +1,123 @@
+require('dotenv').config();
+const mysql = require('mysql2');
+
+// Debug: Log environment variables (remove in production)
+console.log('Database Config:', {
+    host: process.env.DB_HOST,
+    user: process.env.DB_USER,
+    password: process.env.DB_PASS,
+    port: process.env.DB_PORT || 3306,
+    database: 'Qcodeigniter'
+});
+
+const conn = mysql.createConnection({
+    host: process.env.DB_HOST,
+    user: process.env.DB_USER,
+    password: process.env.DB_PASS,
+    port: process.env.DB_PORT || 3306,
+    database: 'Qcodeigniter',
+})
+
+conn.connect((err) => {
+    if (err) {
+        console.log("ERROR: " + err.message);
+        return;
+    }
+    console.log('Connection established');
+})
+
+
+let dataPool = {}
+
+dataPool.authUser = (username, password) => {
+    return new Promise((resolve, reject) => {
+        conn.query('SELECT * FROM user WHERE username = ? AND password_hash = ?', [username, password], (err, res, fields) => {
+            if (err) { return reject(err) }
+            return resolve(res)
+        })
+    })
+}
+
+dataPool.registerUser = (username, password) => {
+    return new Promise((resolve, reject) => {
+        conn.query('INSERT INTO user (username, password_hash) VALUES (?, ?)', [username, password], (err, res) => {
+            if (err) { return reject(err) }
+            return resolve(res)
+        })
+    })
+}
+
+dataPool.createEvent = (organizer_id, title, sport_id, location, datetime, max_players, skill_level) => {
+    return new Promise((resolve, reject) => {
+        conn.query(
+            'INSERT INTO GameEvent (organizer_id, title, sport, location, datetime, max_players, skill_level) VALUES (?, ?, ?, ?, ?, ?, ?)', 
+            [organizer_id, title, sport_id, location, datetime, max_players, skill_level], 
+            (err, res) => {
+                if (err) { 
+                    return reject(err);
+                }
+                return resolve(res);
+            }
+        );
+    });
+}
+
+dataPool.getAllEvents = () => {
+    return new Promise((resolve, reject) => {
+        conn.query(
+            'SELECT e.*, u.username as organizer_name, s.name as sport_name FROM GameEvent e LEFT JOIN user u ON e.organizer_id = u.id LEFT JOIN Sport s ON e.sport = s.id ORDER BY e.datetime ASC', 
+            (err, res) => {
+                if (err) { 
+                    return reject(err);
+                }
+                return resolve(res);
+            }
+        );
+    });
+}
+
+dataPool.getAllSports = () => {
+    return new Promise((resolve, reject) => {
+        conn.query(
+            'SELECT * FROM Sport ORDER BY name ASC', 
+            (err, res) => {
+                if (err) { 
+                    return reject(err);
+                }
+                return resolve(res);
+            }
+        );
+    });
+}
+
+dataPool.getSportByName = (sportName) => {
+    return new Promise((resolve, reject) => {
+        conn.query(
+            'SELECT * FROM Sport WHERE name = ?', 
+            [sportName],
+            (err, res) => {
+                if (err) { 
+                    return reject(err);
+                }
+                return resolve(res);
+            }
+        );
+    });
+}
+
+dataPool.createSport = (user_id, name) => {
+    return new Promise((resolve, reject) => {
+        conn.query(
+            'INSERT INTO Sport (user_id, name) VALUES (?, ?)', 
+            [user_id, name], 
+            (err, res) => {
+                if (err) { 
+                    return reject(err);
+                }
+                return resolve(res);
+            }
+        );
+    });
+}
+
+module.exports = dataPool;
