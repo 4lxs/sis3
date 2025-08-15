@@ -21,7 +21,7 @@ export default function SignIn() {
   const [messageType, setMessageType] = useState<"success" | "error" | "">("");
   const navigate = useNavigate();
 
-  const API_BASE_URL = "http://localhost:3000"; // Adjust this to match your backend port
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000";
 
   const showMessage = (text: string, type: "success" | "error") => {
     setMessage(text);
@@ -35,7 +35,7 @@ export default function SignIn() {
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    
+
     try {
       const response = await axios.post(`${API_BASE_URL}/users/login`, {
         username,
@@ -43,12 +43,12 @@ export default function SignIn() {
       }, {
         withCredentials: true // Include cookies in the request
       });
-      
+
       if (response.data.success) {
         showMessage("Login successful!", "success");
         // TODO: Handle successful login (e.g., redirect to dashboard, store session)
         console.log("User logged in:", response.data.user);
-        
+
         // Redirect to homepage after a short delay
         setTimeout(() => {
           navigate('/');
@@ -69,7 +69,7 @@ export default function SignIn() {
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    
+
     try {
       const response = await axios.post(`${API_BASE_URL}/users/register`, {
         username,
@@ -77,11 +77,11 @@ export default function SignIn() {
       }, {
         withCredentials: true // Include cookies in the request
       });
-      
+
       if (response.data.success) {
         showMessage("Registration successful!", "success");
         console.log("User registered:", response.data.user);
-        
+
         // Redirect to homepage after a short delay
         setTimeout(() => {
           navigate('/');
@@ -114,7 +114,7 @@ export default function SignIn() {
           <h1 className="text-4xl font-bold text-blue-600 dark:text-blue-400 mb-2">SIS</h1>
           <p className="text-sm text-gray-600 dark:text-gray-400 mb-8">Sports Information System</p>
         </div>
-        
+
         <h2 className="text-center text-3xl font-bold text-gray-900 dark:text-white">
           Welcome to SIS
         </h2>
@@ -127,11 +127,10 @@ export default function SignIn() {
         <div className="bg-white dark:bg-gray-800 py-8 px-4 shadow-xl rounded-lg sm:px-10 border border-gray-200 dark:border-gray-700">
           {/* Message Display */}
           {message && (
-            <div className={`mb-6 p-4 rounded-md ${
-              messageType === "success" 
+            <div className={`mb-6 p-4 rounded-md ${messageType === "success"
                 ? "bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-800 dark:text-green-200"
                 : "bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-800 dark:text-red-200"
-            }`}>
+              }`}>
               <div className="flex">
                 <div className="flex-shrink-0">
                   {messageType === "success" ? (
@@ -150,7 +149,7 @@ export default function SignIn() {
               </div>
             </div>
           )}
-          
+
           <form onSubmit={handleSignIn} className="space-y-6">
             {/* Username Field */}
             <div>
@@ -229,7 +228,7 @@ export default function SignIn() {
                 )}
                 Sign In
               </button>
-              
+
               <button
                 type="button"
                 onClick={handleRegister}

@@ -16,7 +16,7 @@ var rsvpRouter = require('./routes/rsvp');
 var app = express();
 
 app.use(cors({
-  origin: ['http://localhost:5173', 'http://localhost:5174'],
+  origin: [`http://localhost:${process.env.VITE_PORT || 5173}`, 'http://localhost:5174'],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
