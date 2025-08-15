@@ -65,7 +65,14 @@ dataPool.createEvent = (organizer_id, title, sport_id, location, datetime, max_p
 dataPool.getAllEvents = () => {
     return new Promise((resolve, reject) => {
         conn.query(
-            'SELECT e.*, u.username as organizer_name, s.name as sport_name FROM GameEvent e LEFT JOIN user u ON e.organizer_id = u.id LEFT JOIN Sport s ON e.sport = s.id ORDER BY e.datetime ASC',
+            `SELECT e.*, u.username as organizer_name, s.name as sport_name, 
+                    COUNT(r.user_id) as current_players
+             FROM GameEvent e 
+             LEFT JOIN user u ON e.organizer_id = u.id 
+             LEFT JOIN Sport s ON e.sport = s.id 
+             LEFT JOIN RSVP r ON e.id = r.gameevent_id
+             GROUP BY e.id, u.username, s.name
+             ORDER BY e.datetime ASC`,
             (err, res) => {
                 if (err) {
                     return reject(err);
@@ -190,6 +197,17 @@ dataPool.getUserJoinedGames = (userId) => {
         conn.query(sql, [userId], (err, results) => {
             if (err) return reject(err);
             resolve(results);
+        });
+    });
+};
+
+// Get RSVP count for a specific game
+dataPool.getRSVPCount = (gameId) => {
+    return new Promise((resolve, reject) => {
+        const sql = `SELECT COUNT(*) as count FROM RSVP WHERE gameevent_id = ?`;
+        conn.query(sql, [gameId], (err, results) => {
+            if (err) return reject(err);
+            resolve(results[0].count);
         });
     });
 };
