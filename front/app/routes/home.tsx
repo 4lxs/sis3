@@ -5,7 +5,7 @@ import axios from "axios";
 // Configure axios to include credentials by default
 axios.defaults.withCredentials = true;
 
-export function meta({}: Route.MetaArgs) {
+export function meta({ }: Route.MetaArgs) {
   return [
     { title: "SIS - Pickup Sports Hub" },
     { name: "description", content: "Find and join pickup sports games in your area" },
@@ -28,7 +28,7 @@ export default function Home() {
   const [isLoadingSports, setIsLoadingSports] = useState(true);
   const [selectedSport, setSelectedSport] = useState("");
   const [newSport, setNewSport] = useState("");
-  
+
   const API_BASE_URL = "http://localhost:3000";
 
   // Check authentication status on component mount
@@ -38,13 +38,18 @@ export default function Home() {
     fetchSports();
   }, []);
 
+  // Fetch joined games when login status changes
+  useEffect(() => {
+    fetchMyGames();
+  }, [isLoggedIn]);
+
   const fetchSports = async () => {
     try {
       setIsLoadingSports(true);
       const response = await axios.get(`${API_BASE_URL}/sports`, {
         withCredentials: true
       });
-      
+
       if (response.data.success) {
         setAvailableSports(response.data.sports || []);
       }
@@ -68,9 +73,9 @@ export default function Home() {
       const response = await axios.get(`${API_BASE_URL}/events`, {
         withCredentials: true
       });
-      
+
       console.log('Events response:', response.data); // Debug log
-      
+
       if (response.data.success) {
         console.log('Setting events:', response.data.events); // Debug log
         setEvents(response.data.events || []);
@@ -86,7 +91,7 @@ export default function Home() {
 
   const handleCreateGame = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!isLoggedIn) {
       setShowLoginPrompt(true);
       setTimeout(() => setShowLoginPrompt(false), 3000);
@@ -95,7 +100,7 @@ export default function Home() {
 
     // Combine date and time into datetime format
     const datetime = `${newGame.date} ${newGame.time}:00`;
-    
+
     try {
       const response = await axios.post(`${API_BASE_URL}/events/create`, {
         title: newGame.title,
@@ -107,7 +112,7 @@ export default function Home() {
       }, {
         withCredentials: true
       });
-      
+
       if (response.data.success) {
         // Reset form
         setNewGame({
@@ -122,14 +127,14 @@ export default function Home() {
         });
         setSelectedSport("");
         setNewSport("");
-        
+
         // Close form
         setShowCreateForm(false);
-        
+
         // Refresh events list and sports list
         fetchEvents();
         fetchSports();
-        
+
         // Show success message (you could add a toast notification here)
         alert('Game created successfully!');
       }
@@ -161,7 +166,7 @@ export default function Home() {
       const response = await axios.get(`${API_BASE_URL}/users/profile`, {
         withCredentials: true
       });
-      
+
       if (response.data.success) {
         setUser(response.data.user);
         setIsLoggedIn(true);
@@ -181,12 +186,12 @@ export default function Home() {
       await axios.post(`${API_BASE_URL}/users/logout`, {}, {
         withCredentials: true
       });
-      
+
       // Clear local state
       setIsLoggedIn(false);
       setUser(null);
       setShowUserMenu(false);
-      
+
       console.log('Successfully logged out'); // Debug log
     } catch (error) {
       console.error('Logout error:', error);
@@ -198,7 +203,7 @@ export default function Home() {
       setIsLoggingOut(false);
     }
   };
-  
+
   // Create game form state
   const [newGame, setNewGame] = useState({
     title: "",
@@ -212,7 +217,75 @@ export default function Home() {
   });
 
   // Mock user games (games the user has joined)
-  const myGameIds = [1, 3, 5]; // User has joined games with these IDs
+  const [myGameIds, setMyGameIds] = useState<number[]>([]); // User has joined games with these IDs
+
+  // Fetch user's joined games
+  const fetchMyGames = async () => {
+    if (!isLoggedIn) {
+      setMyGameIds([]);
+      return;
+    }
+
+    try {
+      const response = await axios.get(`${API_BASE_URL}/users/joined-games`, {
+        withCredentials: true
+      });
+
+      if (response.data.success) {
+        const joinedGameIds = response.data.games.map((game: any) => game.id);
+        setMyGameIds(joinedGameIds);
+      }
+    } catch (error) {
+      console.error('Failed to fetch joined games:', error);
+      setMyGameIds([]);
+    }
+  };
+
+  // Handle joining a game
+  const handleJoinGame = async (gameId: number) => {
+    if (!isLoggedIn) {
+      setShowLoginPrompt(true);
+      setTimeout(() => setShowLoginPrompt(false), 3000);
+      return;
+    }
+
+    try {
+      const response = await axios.post(`${API_BASE_URL}/events/${gameId}/join`, {}, {
+        withCredentials: true
+      });
+
+      if (response.data.success) {
+        // Update local state
+        setMyGameIds(prev => [...prev, gameId]);
+        // Refresh events to update player counts
+        fetchEvents();
+        alert('Successfully joined the game!');
+      }
+    } catch (error: any) {
+      console.error('Failed to join game:', error);
+      alert(error.response?.data?.message || 'Failed to join game. Please try again.');
+    }
+  };
+
+  // Handle leaving a game
+  const handleLeaveGame = async (gameId: number) => {
+    try {
+      const response = await axios.post(`${API_BASE_URL}/events/${gameId}/leave`, {}, {
+        withCredentials: true
+      });
+
+      if (response.data.success) {
+        // Update local state
+        setMyGameIds(prev => prev.filter(id => id !== gameId));
+        // Refresh events to update player counts
+        fetchEvents();
+        alert('Successfully left the game!');
+      }
+    } catch (error: any) {
+      console.error('Failed to leave game:', error);
+      alert(error.response?.data?.message || 'Failed to leave game. Please try again.');
+    }
+  };
 
   // Transform events data to match the expected format
   const transformedEvents = events.map(event => ({
@@ -221,19 +294,19 @@ export default function Home() {
     title: event.title || `${event.sport_name || event.sport} Game`, // Use actual title from database
     location: event.location,
     date: new Date(event.datetime).toISOString().split('T')[0],
-    time: new Date(event.datetime).toLocaleTimeString('en-US', { 
-      hour: '2-digit', 
+    time: new Date(event.datetime).toLocaleTimeString('en-US', {
+      hour: '2-digit',
       minute: '2-digit',
-      hour12: true 
+      hour12: true
     }),
     playersNeeded: Math.max(0, event.max_players - (event.current_players || 0)),
     totalPlayers: event.max_players,
     skillLevel: event.skill_level,
     organizer: event.organizer_name || 'Unknown',
     description: event.description || `${event.skill_level}`,
-    icon: (event.sport_name || event.sport || '').toLowerCase() === 'basketball' ? '🏀' : 
-          (event.sport_name || event.sport || '').toLowerCase() === 'soccer' ? '⚽' : 
-          (event.sport_name || event.sport || '').toLowerCase() === 'tennis' ? '🎾' : 
+    icon: (event.sport_name || event.sport || '').toLowerCase() === 'basketball' ? '🏀' :
+      (event.sport_name || event.sport || '').toLowerCase() === 'soccer' ? '⚽' :
+        (event.sport_name || event.sport || '').toLowerCase() === 'tennis' ? '🎾' :
           (event.sport_name || event.sport || '').toLowerCase() === 'volleyball' ? '🏐' : '⚽'
   }));
 
@@ -244,17 +317,17 @@ export default function Home() {
 
   // Apply filtering
   let baseGames = activeTab === "my" ? myGames : allGames;
-  
+
   const filteredGames = baseGames.filter(game => {
     // Search filter
-    const matchesSearch = searchTerm === "" || 
+    const matchesSearch = searchTerm === "" ||
       game.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
       game.location.toLowerCase().includes(searchTerm.toLowerCase()) ||
       game.organizer.toLowerCase().includes(searchTerm.toLowerCase());
-    
+
     // Sport filter
     const matchesSport = selectedSport === "" || game.sport === selectedSport;
-    
+
     return matchesSearch && matchesSport;
   });
 
@@ -283,7 +356,7 @@ export default function Home() {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                     </svg>
                   </button>
-                  
+
                   {showUserMenu && (
                     <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1 z-50">
                       <button
@@ -332,7 +405,7 @@ export default function Home() {
               Join pickup sports games in your area or organize your own
             </p>
             <div className="relative">
-              <button 
+              <button
                 onClick={() => {
                   if (!isLoggedIn) {
                     setShowLoginPrompt(true);
@@ -345,13 +418,13 @@ export default function Home() {
               >
                 Create New Game
               </button>
-              
+
               {showLoginPrompt && (
                 <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 bg-gray-800 text-white px-4 py-2 rounded-lg text-sm whitespace-nowrap z-10">
                   <div className="flex items-center space-x-2">
                     <span>Please sign in to create a game</span>
-                    <a 
-                      href="/signin" 
+                    <a
+                      href="/signin"
                       className="bg-blue-600 hover:bg-blue-700 px-2 py-1 rounded text-xs font-medium"
                     >
                       Sign In
@@ -365,7 +438,7 @@ export default function Home() {
             {showCreateForm && (
               <div className="mt-8 bg-white/10 backdrop-blur-sm rounded-lg border border-white/20 p-6 text-left">
                 <h3 className="text-xl font-semibold text-white mb-6">Organize Your Game</h3>
-                
+
                 <form onSubmit={handleCreateGame} className="space-y-6">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {/* Game Title */}
@@ -377,7 +450,7 @@ export default function Home() {
                         type="text"
                         id="title"
                         value={newGame.title}
-                        onChange={(e) => setNewGame({...newGame, title: e.target.value})}
+                        onChange={(e) => setNewGame({ ...newGame, title: e.target.value })}
                         className="w-full px-3 py-2 border border-white/30 rounded-md focus:ring-2 focus:ring-white/50 focus:border-transparent bg-white/20 text-white placeholder-blue-200"
                         placeholder="e.g., Morning Basketball at Central Park"
                         required
@@ -395,7 +468,7 @@ export default function Home() {
                         onChange={(e) => {
                           setSelectedSport(e.target.value);
                           if (e.target.value !== 'new') {
-                            setNewGame({...newGame, sport: e.target.value});
+                            setNewGame({ ...newGame, sport: e.target.value });
                             setNewSport('');
                           }
                         }}
@@ -408,7 +481,7 @@ export default function Home() {
                         ))}
                         <option value="new" className="text-gray-900">+ Create new sport</option>
                       </select>
-                      
+
                       {selectedSport === 'new' && (
                         <input
                           type="text"
@@ -416,7 +489,7 @@ export default function Home() {
                           value={newSport}
                           onChange={(e) => {
                             setNewSport(e.target.value);
-                            setNewGame({...newGame, sport: e.target.value});
+                            setNewGame({ ...newGame, sport: e.target.value });
                           }}
                           className="w-full px-3 py-2 border border-white/30 rounded-md focus:ring-2 focus:ring-white/50 focus:border-transparent bg-white/20 text-white placeholder-blue-200 mt-2"
                           required
@@ -433,7 +506,7 @@ export default function Home() {
                         type="text"
                         id="location"
                         value={newGame.location}
-                        onChange={(e) => setNewGame({...newGame, location: e.target.value})}
+                        onChange={(e) => setNewGame({ ...newGame, location: e.target.value })}
                         className="w-full px-3 py-2 border border-white/30 rounded-md focus:ring-2 focus:ring-white/50 focus:border-transparent bg-white/20 text-white placeholder-blue-200"
                         placeholder="e.g., Central Park Courts"
                         required
@@ -449,7 +522,7 @@ export default function Home() {
                         type="date"
                         id="date"
                         value={newGame.date}
-                        onChange={(e) => setNewGame({...newGame, date: e.target.value})}
+                        onChange={(e) => setNewGame({ ...newGame, date: e.target.value })}
                         className="w-full px-3 py-2 border border-white/30 rounded-md focus:ring-2 focus:ring-white/50 focus:border-transparent bg-white/20 text-white"
                         required
                       />
@@ -464,7 +537,7 @@ export default function Home() {
                         type="time"
                         id="time"
                         value={newGame.time}
-                        onChange={(e) => setNewGame({...newGame, time: e.target.value})}
+                        onChange={(e) => setNewGame({ ...newGame, time: e.target.value })}
                         className="w-full px-3 py-2 border border-white/30 rounded-md focus:ring-2 focus:ring-white/50 focus:border-transparent bg-white/20 text-white"
                         required
                       />
@@ -481,7 +554,7 @@ export default function Home() {
                         min="2"
                         max="50"
                         value={newGame.totalPlayers}
-                        onChange={(e) => setNewGame({...newGame, totalPlayers: parseInt(e.target.value)})}
+                        onChange={(e) => setNewGame({ ...newGame, totalPlayers: parseInt(e.target.value) })}
                         className="w-full px-3 py-2 border border-white/30 rounded-md focus:ring-2 focus:ring-white/50 focus:border-transparent bg-white/20 text-white"
                         required
                       />
@@ -496,7 +569,7 @@ export default function Home() {
                         type="text"
                         id="skillLevel"
                         value={newGame.skillLevel}
-                        onChange={(e) => setNewGame({...newGame, skillLevel: e.target.value})}
+                        onChange={(e) => setNewGame({ ...newGame, skillLevel: e.target.value })}
                         className="w-full px-3 py-2 border border-white/30 rounded-md focus:ring-2 focus:ring-white/50 focus:border-transparent bg-white/20 text-white placeholder-blue-200"
                         placeholder="e.g., Beginner, Intermediate, Advanced"
                         required
@@ -575,21 +648,19 @@ export default function Home() {
             <div className="flex space-x-1 bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
               <button
                 onClick={() => setActiveTab("all")}
-                className={`px-4 py-2 text-sm font-medium rounded-md transition-colors duration-200 ${
-                  activeTab === "all"
-                    ? "bg-white dark:bg-gray-600 text-blue-600 dark:text-blue-400 shadow-sm"
-                    : "text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400"
-                }`}
+                className={`px-4 py-2 text-sm font-medium rounded-md transition-colors duration-200 ${activeTab === "all"
+                  ? "bg-white dark:bg-gray-600 text-blue-600 dark:text-blue-400 shadow-sm"
+                  : "text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400"
+                  }`}
               >
                 All Games ({allGames.length})
               </button>
               <button
                 onClick={() => setActiveTab("my")}
-                className={`px-4 py-2 text-sm font-medium rounded-md transition-colors duration-200 ${
-                  activeTab === "my"
-                    ? "bg-white dark:bg-gray-600 text-blue-600 dark:text-blue-400 shadow-sm"
-                    : "text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400"
-                }`}
+                className={`px-4 py-2 text-sm font-medium rounded-md transition-colors duration-200 ${activeTab === "my"
+                  ? "bg-white dark:bg-gray-600 text-blue-600 dark:text-blue-400 shadow-sm"
+                  : "text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400"
+                  }`}
               >
                 My Games ({myGames.length})
               </button>
@@ -610,7 +681,7 @@ export default function Home() {
                   </svg>
                   <p className="text-gray-500 dark:text-gray-400 text-lg mb-2">You haven't joined any games yet.</p>
                   <p className="text-gray-400 dark:text-gray-500 text-sm mb-4">Browse all games and join one to get started!</p>
-                  <button 
+                  <button
                     onClick={() => setActiveTab("all")}
                     className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg"
                   >
@@ -624,7 +695,7 @@ export default function Home() {
                   </svg>
                   <p className="text-gray-500 dark:text-gray-400 text-lg mb-2">No games found matching your criteria.</p>
                   <p className="text-gray-400 dark:text-gray-500 text-sm mb-4">Try adjusting your search filters or create a new game.</p>
-                  <button 
+                  <button
                     onClick={() => {
                       if (!isLoggedIn) {
                         setShowLoginPrompt(true);
@@ -653,11 +724,10 @@ export default function Home() {
                           <p className="text-sm text-gray-600 dark:text-gray-400">{game.sport}</p>
                         </div>
                       </div>
-                      <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                        game.skillLevel === 'Beginner' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' :
+                      <span className={`px-2 py-1 text-xs font-medium rounded-full ${game.skillLevel === 'Beginner' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' :
                         game.skillLevel === 'Intermediate' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' :
-                        'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-                      }`}>
+                          'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                        }`}>
                         {game.skillLevel}
                       </span>
                     </div>
@@ -694,17 +764,33 @@ export default function Home() {
                         </span>
                       </div>
                       {myGameIds.includes(game.id) ? (
-                        <button className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition duration-300 flex items-center">
+                        <button
+                          onClick={() => handleLeaveGame(game.id)}
+                          className="bg-green-600 hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition duration-300 flex items-center"
+                        >
                           <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                           </svg>
                           Joined
                         </button>
                       ) : (
-                        <button className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition duration-300">
+                        <button
+                          onClick={() => handleJoinGame(game.id)}
+                          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition duration-300"
+                        >
                           Join Game
                         </button>
                       )}
+                    </div>
+
+                    {/* Comments Button */}
+                    <div className="mt-4 flex justify-end">
+                      <a
+                        href={`/game/${game.id}/comments`}
+                        className="bg-gray-200 dark:bg-gray-700 hover:bg-blue-600 hover:text-white text-blue-600 dark:text-blue-400 px-4 py-2 rounded-lg text-sm font-medium transition duration-300"
+                      >
+                        View Comments
+                      </a>
                     </div>
                   </div>
                 </div>
